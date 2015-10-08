@@ -18,7 +18,6 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 21
     buildToolsVersion "21.1.2"
-
     defaultConfig {
         applicationId "com.lmoroney.udacityplus1_1"
         minSdkVersion 15
@@ -26,10 +25,30 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        debug {
+            keyAlias 'debug'
+            keyPassword 'android_debug'
+            storeFile rootProject.file('android.keystore')
+            storePassword 'android'
+        }
+        release {
+            keyAlias 'release'
+            keyPassword 'android_release'
+            storeFile rootProject.file('android.keystore')
+            storePassword 'android'
+        }
+    }
     buildTypes {
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
