@@ -20,7 +20,7 @@ android {
     buildToolsVersion "21.1.2"
 
     defaultConfig {
-        applicationId "com.lmoroney.udacityplus2_1"
+        applicationId "com.jpventura.capstone"
         minSdkVersion 15
         targetSdkVersion 21
         versionCode 1

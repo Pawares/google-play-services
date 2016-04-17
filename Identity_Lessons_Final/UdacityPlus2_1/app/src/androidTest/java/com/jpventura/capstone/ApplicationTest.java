@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.lmoroney.udacityplus2_1;
+package com.jpventura.capstone;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;
