@@ -84,6 +84,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
     private static final int OPENING = 2;
     private static final int CLOSED = 3;
 
+    String[] estados = new String[] {"SIGNED_IN", "STATE_SIGNING_IN", "OPENING", "CLOSED"};
+
     private PendingIntent mSignInIntent;
     private int mSignInError;
 
@@ -118,19 +120,18 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                 .addScope(new Scope("email"))
                 .build();
     }
+
     @Override
     protected void onStart() {
         super.onStart();
-        mGoogleApiClient.connect();
+        onStartClient();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
 
-        if (mGoogleApiClient.isConnected()) {
-            mGoogleApiClient.disconnect();
-        }
+        onStopClient();
     }
 
     @Override
@@ -171,11 +172,20 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
 
         // In this sample we consider the user signed out whenever they do not have
         // a connection to Google Play services.
-        setSessionState(CLOSED);
+
+
+        // Update the UI to reflect that the user is signed out.
+        Log.e("ventura", "onConnectionFailed estado -> " + estados[mSignInProgress]);
+
+        mSignInButton.setEnabled(true);
+        mSignOutButton.setEnabled(false);
+        mRevokeButton.setEnabled(false);
+        mStatus.setText("Signed out");
     }
 
     private void resolveSignInError() {
         if (mSignInIntent != null) {
+            Log.e("ventura", "state => " + estados[mSignInProgress]);
             // We have an intent which will allow our user to sign in or
             // resolve an error.  For example if the user needs to
             // select an account to sign in with, or if they need to consent
@@ -200,6 +210,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                 mGoogleApiClient.connect();
             }
         } else {
+            Log.e("ventura", "cai no else " + estados[mSignInProgress]);
+
             // Google Play services wasn't able to provide an intent for some
             // error types, so we show the default Google Play services error
             // dialog which may still start an intent on our behalf if the
@@ -209,29 +221,9 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode,
-                                    Intent data) {
-        switch (requestCode) {
-            case RC_SIGN_IN:
-                if (resultCode == RESULT_OK) {
-                    // If the error resolution was successful we should continue
-                    // processing errors.
-                    mSignInProgress = STATE_SIGNING_IN;
-                    setSessionState(STATE_SIGNING_IN);
-                } else {
-                    // If the error resolution was not successful or the user canceled,
-                    // we should stop processing errors.
-                    mSignInProgress = SIGNED_IN;
-                    setSessionState(SIGNED_IN);
-                }
-
-                if (!mGoogleApiClient.isConnecting()) {
-                    // If Google Play services resolved the issue with a dialog then
-                    // onStart is not called so we need to re-attempt connection here.
-                    mGoogleApiClient.connect();
-                }
-                break;
-        }
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.e("ventura", "MainActivity.onActivityResult");
+        onActivityResultClient(requestCode, resultCode, data);
     }
 
     @Override
@@ -241,6 +233,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
             // between connected and not connected.
             switch (v.getId()) {
                 case R.id.sign_in_button:
+                    Log.e("ventura", "state: " + Integer.toString(mSignInProgress));
                     resolveSignInError();
                     break;
                 case R.id.sign_out_button:
@@ -297,6 +290,64 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         mSignInProgress = sessionState;
         if (null != mOnChangeListener) {
             mOnChangeListener.onChange(mSignInProgress);
+        }
+    }
+
+    public void onActivityResultClient(int requestCode, int resultCode, Intent data) {
+        if (RC_SIGN_IN != requestCode) return;
+
+        if (resultCode == RESULT_OK) {
+            // If the error resolution was successful we should continue
+            // processing errors.
+            mSignInProgress = STATE_SIGNING_IN;
+            setSessionState(STATE_SIGNING_IN);
+        } else {
+            // If the error resolution was not successful or the user canceled,
+            // we should stop processing errors.
+            mSignInProgress = SIGNED_IN;
+            setSessionState(SIGNED_IN);
+        }
+
+        if (!mGoogleApiClient.isConnecting()) {
+            // If Google Play services resolved the issue with a dialog then
+            // onStart is not called so we need to re-attempt connection here.
+            mGoogleApiClient.connect();
+        }
+    }
+
+    public void onStartClient() {
+        mGoogleApiClient.connect();
+    }
+
+    public void onStopClient() {
+        if (mGoogleApiClient.isConnected()) {
+            mGoogleApiClient.disconnect();
+        }
+    }
+
+    public void connect() {
+        switch (mSignInProgress) {
+            case SIGNED_IN:
+                break;
+            case STATE_SIGNING_IN:
+                break;
+            case OPENING:
+                break;
+            case CLOSED:
+                break;
+        }
+    }
+
+    public void disconnect() {
+        switch (mSignInProgress) {
+            case SIGNED_IN:
+                break;
+            case STATE_SIGNING_IN:
+                break;
+            case OPENING:
+                break;
+            case CLOSED:
+                break;
         }
     }
 }
