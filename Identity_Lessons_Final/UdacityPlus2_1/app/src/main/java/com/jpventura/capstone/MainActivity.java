@@ -15,9 +15,7 @@
  */
 package com.jpventura.capstone;
 
-import android.app.PendingIntent;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -27,71 +25,19 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.Scope;
-import com.google.android.gms.plus.Plus;
+import java.util.Observable;
+import java.util.Observer;
 
 
-public class MainActivity extends ActionBarActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, OnChangeListener {
-    public void onChange(int state) {
-        switch (state) {
-            case SIGNED_IN:
-                // Reaching onConnected means we consider the user signed in.
-                Log.i(TAG, "onConnected");
-
-                // Update the user interface to reflect that the user is signed in.
-                mSignInButton.setEnabled(false);
-                mSignOutButton.setEnabled(true);
-                mRevokeButton.setEnabled(true);
-
-                // We are signed in!
-                // Retrieve some profile information to personalize our app for the user.
-                try {
-                    String emailAddress = Plus.AccountApi.getAccountName(mGoogleApiClient);
-                    mStatus.setText(String.format("Signed In to My App as %s", emailAddress));
-                } catch(Exception ex) {
-                    String exception = ex.getLocalizedMessage();
-                    String exceptionString = ex.toString();
-                }
-                break;
-            case SIGN_IN_REQUIRED:
-                break;
-            case OPENING:
-                mStatus.setText("Signing In");
-                break;
-            case CLOSED:
-                // Update the UI to reflect that the user is signed out.
-                mSignInButton.setEnabled(true);
-                mSignOutButton.setEnabled(false);
-                mRevokeButton.setEnabled(false);
-                mStatus.setText("Signed out");
-                break;
-        }
-    }
-
+public class MainActivity extends ActionBarActivity implements View.OnClickListener, IGoogleController.OnChangeListener {
     private Button mSignInButton;
     private Button mSignOutButton;
     private Button mRevokeButton;
     private TextView mStatus;
 
-    private GoogleApiClient mGoogleApiClient;
-
     private static final String TAG = "signin1";
 
-    private static final int SIGNED_IN = 0;
-    private static final int SIGN_IN_REQUIRED = 1;
-    private static final int OPENING = 2;
-    private static final int CLOSED = 3;
-
-    String[] estados = new String[] {"SIGNED_IN", "STATE_SIGNING_IN", "OPENING", "CLOSED"};
-
-    private PendingIntent mSignInIntent;
-    private int mSignInError;
-
-    private static final int RC_SIGN_IN = 0;
-
-    private static final int DIALOG_PLAY_SERVICES_ERROR = 0;
+    private GoogleController mGoogleController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,161 +53,46 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         mSignOutButton.setOnClickListener(this);
         mRevokeButton.setOnClickListener(this);
 
-        mGoogleApiClient = buildApiClient();
-        mOnChangeListener = this;
-        setSessionState(CLOSED);
-    }
-
-    private GoogleApiClient buildApiClient(){
-        return new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(Plus.API, Plus.PlusOptions.builder().build())
-                .addScope(new Scope("email"))
-                .build();
+        mGoogleController = (GoogleController) GoogleController.instance(this);
+        mGoogleController.setOnChangeListener(this);
+        mGoogleController.onCreate();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        onStartClient();
+        mGoogleController.onStart();
     }
 
     @Override
     protected void onStop() {
+        mGoogleController.onStop();
         super.onStop();
-
-        onStopClient();
     }
 
     @Override
-    public void onConnectionSuspended(int cause) {
-        // The connection to Google Play services was lost for some reason.
-        // We call connect() to attempt to re-establish the connection or get a
-        // ConnectionResult that we can attempt to resolve.
-        int CAUSE_SERVICE_DISCONNECTED = 1;
-        int CAUSE_NETWORK_LOST = 2;
-
-        String[] x = new String[]{"CAUSE_SERVICE_DISCONNECTED", "CAUSE_NETWORK_LOST"};
-        Log.e("ventura", "onConnectionSuspended(" + x[cause - 1] + ")");
-
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onConnected(Bundle connectionHint) {
-        // Indicate that the sign in process is complete.
-        setSessionState(SIGNED_IN);
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult result) {
-        // Refer to the javadoc for ConnectionResult to see what error codes might
-        // be returned in onConnectionFailed.
-        Log.i(TAG, "onConnectionFailed: ConnectionResult.getErrorCode() = "
-                + result.getErrorCode());
-
-        if (mSignInProgress != OPENING) {
-            // We do not have an intent in progress so we should store the latest
-            // error resolution intent for use when the sign in button is clicked.
-            mSignInIntent = result.getResolution();
-            mSignInError = result.getErrorCode();
-            mConnectionResult = result;
-
-            if (mSignInProgress == SIGN_IN_REQUIRED) {
-                // STATE_SIGNING_IN indicates the user already clicked the sign in button
-                // so we should continue processing errors until the user is signed in
-                // or they click cancel.
-                resolveSignInError();
-            }
-        }
-
-        // In this sample we consider the user signed out whenever they do not have
-        // a connection to Google Play services.
-
-
-        // Update the UI to reflect that the user is signed out.
-        Log.e("ventura", "onConnectionFailed estado -> " + estados[mSignInProgress]);
-
-        mSignInButton.setEnabled(true);
-        mSignOutButton.setEnabled(false);
-        mRevokeButton.setEnabled(false);
-        mStatus.setText("Signed out");
-    }
-
-    private void resolveSignInError() {
-        if (mSignInIntent != null) {
-            Log.e("ventura", "state => " + estados[mSignInProgress]);
-            // We have an intent which will allow our user to sign in or
-            // resolve an error.  For example if the user needs to
-            // select an account to sign in with, or if they need to consent
-            // to the permissions your app is requesting.
-
-            try {
-                // Send the pending intent that we stored on the most recent
-                // OnConnectionFailed callback.  This will allow the user to
-                // resolve the error currently preventing our connection to
-                // Google Play services.
-                setSessionState(OPENING);
-                mConnectionResult.startResolutionForResult(this, RC_SIGN_IN);
-                // startIntentSenderForResult(mSignInIntent.getIntentSender(),  RC_SIGN_IN, null, 0, 0, 0);
-            } catch (IntentSender.SendIntentException e) {
-                Log.i(TAG, "Sign in intent could not be sent: "
-                        + e.getLocalizedMessage());
-                // The intent was canceled before it was sent.  Attempt to connect to
-                // get an updated ConnectionResult.
-                setSessionState(SIGN_IN_REQUIRED);
-                mGoogleApiClient.connect();
-            }
-        } else {
-            Log.e("ventura", "cai no else " + estados[mSignInProgress]);
-
-            // Google Play services wasn't able to provide an intent for some
-            // error types, so we show the default Google Play services error
-            // dialog which may still start an intent on our behalf if the
-            // user can resolve the issue.
-            showDialog(DIALOG_PLAY_SERVICES_ERROR);
-        }
+    protected void onDestroy() {
+        mGoogleController.onDestroy();
+        super.onDestroy();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.e("ventura", "MainActivity.onActivityResult");
-        onActivityResultClient(requestCode, resultCode, data);
+        mGoogleController.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
     public void onClick(View v) {
-        if (!mGoogleApiClient.isConnecting()) {
-            // We only process button clicks when GoogleApiClient is not transitioning
-            // between connected and not connected.
-            switch (v.getId()) {
-                case R.id.sign_in_button:
-                    Log.e("ventura", "state : " + Integer.toString(mSignInProgress));
-                    Log.e("ventura", "result: " + mConnectionResult.toString());
-                    resolveSignInError();
-                    break;
-                case R.id.sign_out_button:
-                    // We clear the default account on sign out so that Google Play
-                    // services will not return an onConnected callback without user
-                    // interaction.
-                    Plus.AccountApi.clearDefaultAccount(mGoogleApiClient);
-                    mGoogleApiClient.disconnect();
-                    mGoogleApiClient.connect();
-                    break;
-                case R.id.revoke_access_button:
-                    // After we revoke permissions for the user with a GoogleApiClient
-                    // instance, we must discard it and create a new one.
-                    Plus.AccountApi.clearDefaultAccount(mGoogleApiClient);
-                    // Our sample has caches no user data from Google+, however we
-                    // would normally register a callback on revokeAccessAndDisconnect
-                    // to delete user data so that we comply with Google developer
-                    // policies.
-                    Plus.AccountApi.revokeAccessAndDisconnect(mGoogleApiClient);
-                    mGoogleApiClient = buildApiClient();
-                    mGoogleApiClient.connect();
-                    break;
-            }
+        switch (v.getId()) {
+            case R.id.sign_in_button:
+                mGoogleController.connect();
+                break;
+            case R.id.sign_out_button:
+                mGoogleController.disconnect();
+                break;
+            case R.id.revoke_access_button:
+                mGoogleController.revoke();
+                break;
         }
     }
 
@@ -287,100 +118,42 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    public void onChange(int state) {
+        switch (state) {
+            case IGoogleController.SIGNED_IN:
+                // Reaching onConnected means we consider the user signed in.
+                Log.i(TAG, "onConnected");
 
-    private OnChangeListener mOnChangeListener;
-    private int mSignInProgress;
-    private ConnectionResult mConnectionResult;
+                // Update the user interface to reflect that the user is signed in.
+                mSignInButton.setEnabled(false);
+                mSignOutButton.setEnabled(true);
+                mRevokeButton.setEnabled(true);
 
-    private void setSessionState(int sessionState) {
-        mSignInProgress = sessionState;
-        if (null != mOnChangeListener) {
-            mOnChangeListener.onChange(mSignInProgress);
-        }
-    }
+                Log.e("ventura", "porra");
 
-    public void onActivityResultClient(int requestCode, int resultCode, Intent data) {
-        if (RC_SIGN_IN != requestCode) return;
-
-        if (resultCode == RESULT_OK) {
-            // If the error resolution was successful we should continue
-            // processing errors.
-            setSessionState(SIGN_IN_REQUIRED);
-        } else {
-            // If the error resolution was not successful or the user canceled,
-            // we should stop processing errors.
-            setSessionState(SIGNED_IN);
-        }
-
-        if (!mGoogleApiClient.isConnecting()) {
-            // If Google Play services resolved the issue with a dialog then
-            // onStart is not called so we need to re-attempt connection here.
-            mGoogleApiClient.connect();
-        }
-    }
-
-    public void onStartClient() {
-       signIn();
-    }
-
-    public void onStopClient() {
-        if (mGoogleApiClient.isConnected()) {
-            mGoogleApiClient.disconnect();
-        }
-    }
-
-    public void connect() {
-        switch (mSignInProgress) {
-            case SIGNED_IN:
+                // We are signed in!
+                // Retrieve some profile information to personalize our app for the user.
+                try {
+                    String emailAddress = "qq coisa"; // Plus.AccountApi.getAccountName(mGoogleApiClient);
+                    mStatus.setText(String.format("Signed In to My App as %s", emailAddress));
+                } catch(Exception ex) {
+                    String exception = ex.getLocalizedMessage();
+                    String exceptionString = ex.toString();
+                }
                 break;
-            case SIGN_IN_REQUIRED:
+            case IGoogleController.SIGN_IN_REQUIRED:
                 break;
-            case OPENING:
+            case IGoogleController.OPENING:
+                mStatus.setText("Signing In");
                 break;
-            case CLOSED:
+            case IGoogleController.CLOSED:
+                // Update the UI to reflect that the user is signed out.
+                mSignInButton.setEnabled(true);
+                mSignOutButton.setEnabled(false);
+                mRevokeButton.setEnabled(false);
+                mStatus.setText("Signed out");
                 break;
         }
-    }
-
-    public void disconnect() {
-        switch (mSignInProgress) {
-            case SIGNED_IN:
-                break;
-            case SIGN_IN_REQUIRED:
-                break;
-            case OPENING:
-                break;
-            case CLOSED:
-                break;
-        }
-    }
-
-    private void signIn() {
-        if (!mGoogleApiClient.isConnected() && !mGoogleApiClient.isConnecting()) {
-            mGoogleApiClient.connect();
-        }
-    }
-
-    private void signUp() {
-        // We have an intent which will allow our user to sign in or
-        // resolve an error.  For example if the user needs to
-        // select an account to sign in with, or if they need to consent
-        // to the permissions your app is requesting.
-        try {
-            // Send the pending intent that we stored on the most recent
-            // OnConnectionFailed callback.  This will allow the user to
-            // resolve the error currently preventing our connection to
-            // Google Play services.
-            setSessionState(OPENING);
-            mConnectionResult.startResolutionForResult(this, RC_SIGN_IN);
-        } catch (IntentSender.SendIntentException e) {
-            // The intent was canceled before it was sent.  Attempt to connect to
-            // get an updated ConnectionResult.
-            setSessionState(SIGN_IN_REQUIRED);
-            signIn();
-        }
-    }
-
-    private void signOut() {
     }
 }
