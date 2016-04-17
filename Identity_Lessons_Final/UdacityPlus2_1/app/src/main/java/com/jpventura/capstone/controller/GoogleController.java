@@ -1,10 +1,9 @@
-package com.jpventura.capstone;
+package com.jpventura.capstone.controller;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.os.Bundle;
-import android.util.Log;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -12,10 +11,14 @@ import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
 import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.plus.Plus;
+import com.jpventura.capstone.MainActivity;
+import com.jpventura.capstone.boundary.IGoogleController;
 
 import java.lang.ref.WeakReference;
+import java.util.Observable;
+import java.util.Observer;
 
-public class GoogleController implements ConnectionCallbacks, IGoogleController, OnConnectionFailedListener {
+public class GoogleController extends Observable implements ConnectionCallbacks, IGoogleController, OnConnectionFailedListener {
     public static final int REQUEST_CODE = 0x90091e;
 
     private static final Object sLock = new Object();
@@ -33,6 +36,16 @@ public class GoogleController implements ConnectionCallbacks, IGoogleController,
             }
         }
         return sGoogleController;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return GoogleController.class.getSimpleName().equals(o.getClass().getSimpleName());
+    }
+
+    @Override
+    public int hashCode() {
+        return GoogleController.class.getSimpleName().hashCode();
     }
 
     @Override
@@ -55,22 +68,15 @@ public class GoogleController implements ConnectionCallbacks, IGoogleController,
     }
 
     @Override
-    public void onCreate() {
-        Log.e("ventura", "Controller.onCreate()");
-        // addObserver(mActivity.get());
+    public void onCreate(Observer observer) {
+        addObserver(observer);
         mGoogleApiClient = buildApiClient();
-
-        if (mGoogleApiClient.isConnected()) {
-            setSessionState(SIGNED_IN);
-        } else if (mConnectionResult == null) {
-            setSessionState(CLOSED);
-        }
+        setSessionState(CLOSED);
     }
 
     @Override
-    public void onDestroy() {
-        mOnChangeListener = null;
-        Log.e("ventura", "Controller.onDestroy()");
+    public void onDestroy(Observer observer) {
+        deleteObserver(observer);
     }
 
     @Override
@@ -85,13 +91,6 @@ public class GoogleController implements ConnectionCallbacks, IGoogleController,
         if (mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
         }
-    }
-
-    private IGoogleController.OnChangeListener mOnChangeListener;
-
-    @Override
-    public void setOnChangeListener(IGoogleController.OnChangeListener onChangeListener) {
-        mOnChangeListener = onChangeListener;
     }
 
     @Override
@@ -192,8 +191,7 @@ public class GoogleController implements ConnectionCallbacks, IGoogleController,
 
     private void setSessionState(int sessionState) {
         mSignInProgress = sessionState;
-        if (null != mOnChangeListener) {
-            mOnChangeListener.onChange(mSignInProgress);
-        }
+        setChanged();
+        notifyObservers(sessionState);
     }
 }

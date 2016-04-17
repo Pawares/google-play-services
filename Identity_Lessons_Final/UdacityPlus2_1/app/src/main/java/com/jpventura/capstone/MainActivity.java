@@ -15,29 +15,29 @@
  */
 package com.jpventura.capstone;
 
+import android.accounts.Account;
 import android.content.Intent;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.jpventura.capstone.boundary.IGoogleController;
+import com.jpventura.capstone.controller.GoogleController;
+
 import java.util.Observable;
 import java.util.Observer;
 
-
-public class MainActivity extends ActionBarActivity implements View.OnClickListener, IGoogleController.OnChangeListener {
+public class MainActivity extends ActionBarActivity implements Observer, View.OnClickListener {
     private Button mSignInButton;
     private Button mSignOutButton;
     private Button mRevokeButton;
     private TextView mStatus;
 
-    private static final String TAG = "signin1";
-
-    private GoogleController mGoogleController;
+    private IGoogleController mGoogleController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,9 +53,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         mSignOutButton.setOnClickListener(this);
         mRevokeButton.setOnClickListener(this);
 
-        mGoogleController = (GoogleController) GoogleController.instance(this);
-        mGoogleController.setOnChangeListener(this);
-        mGoogleController.onCreate();
+        mGoogleController = GoogleController.instance(this);
+        mGoogleController.onCreate(this);
     }
 
     @Override
@@ -72,7 +71,7 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
 
     @Override
     protected void onDestroy() {
-        mGoogleController.onDestroy();
+        mGoogleController.onDestroy(this);
         super.onDestroy();
     }
 
@@ -119,18 +118,14 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     }
 
     @Override
-    public void onChange(int state) {
-        switch (state) {
+    public void update(Observable controller, Object state) {
+        Account account;
+        switch ((Integer) state) {
             case IGoogleController.SIGNED_IN:
-                // Reaching onConnected means we consider the user signed in.
-                Log.i(TAG, "onConnected");
-
                 // Update the user interface to reflect that the user is signed in.
                 mSignInButton.setEnabled(false);
                 mSignOutButton.setEnabled(true);
                 mRevokeButton.setEnabled(true);
-
-                Log.e("ventura", "porra");
 
                 // We are signed in!
                 // Retrieve some profile information to personalize our app for the user.
