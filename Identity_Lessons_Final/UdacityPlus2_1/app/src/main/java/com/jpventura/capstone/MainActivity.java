@@ -33,7 +33,42 @@ import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.plus.Plus;
 
 
-public class MainActivity extends ActionBarActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, View.OnClickListener{
+public class MainActivity extends ActionBarActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, OnChangeListener {
+    public void onChange(int state) {
+        switch (state) {
+            case SIGNED_IN:
+                // Reaching onConnected means we consider the user signed in.
+                Log.i(TAG, "onConnected");
+
+                // Update the user interface to reflect that the user is signed in.
+                mSignInButton.setEnabled(false);
+                mSignOutButton.setEnabled(true);
+                mRevokeButton.setEnabled(true);
+
+                // We are signed in!
+                // Retrieve some profile information to personalize our app for the user.
+                try {
+                    String emailAddress = Plus.AccountApi.getAccountName(mGoogleApiClient);
+                    mStatus.setText(String.format("Signed In to My App as %s", emailAddress));
+                } catch(Exception ex) {
+                    String exception = ex.getLocalizedMessage();
+                    String exceptionString = ex.toString();
+                }
+                break;
+            case STATE_SIGNING_IN:
+                break;
+            case OPENING:
+                mStatus.setText("Signing In");
+                break;
+            case CLOSED:
+                // Update the UI to reflect that the user is signed out.
+                mSignInButton.setEnabled(true);
+                mSignOutButton.setEnabled(false);
+                mRevokeButton.setEnabled(false);
+                mStatus.setText("Signed out");
+                break;
+        }
+    }
 
     private Button mSignInButton;
     private Button mSignOutButton;
@@ -46,8 +81,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
 
     private static final int SIGNED_IN = 0;
     private static final int STATE_SIGNING_IN = 1;
-    private static final int STATE_IN_PROGRESS = 2;
-    private int mSignInProgress;
+    private static final int OPENING = 2;
+    private static final int CLOSED = 3;
 
     private PendingIntent mSignInIntent;
     private int mSignInError;
@@ -71,6 +106,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         mRevokeButton.setOnClickListener(this);
 
         mGoogleApiClient = buildApiClient();
+        mOnChangeListener = this;
+        setSessionState(CLOSED);
     }
 
     private GoogleApiClient buildApiClient(){
@@ -106,30 +143,9 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
 
     @Override
     public void onConnected(Bundle connectionHint) {
-        // Reaching onConnected means we consider the user signed in.
-        Log.i(TAG, "onConnected");
-
-        // Update the user interface to reflect that the user is signed in.
-        mSignInButton.setEnabled(false);
-        mSignOutButton.setEnabled(true);
-        mRevokeButton.setEnabled(true);
-
         // Indicate that the sign in process is complete.
         mSignInProgress = SIGNED_IN;
-
-        // We are signed in!
-        // Retrieve some profile information to personalize our app for the user.
-        try {
-            ////Person currentUser = Plus.PeopleApi.getCurrentPerson(mGoogleApiClient);
-            ////mStatus.setText(String.format("Signed In to G+ as %s", currentUser.getDisplayName()));
-            String emailAddress = Plus.AccountApi.getAccountName(mGoogleApiClient);
-            mStatus.setText(String.format("Signed In to My App as %s", emailAddress));
-        }
-        catch(Exception ex){
-            String exception = ex.getLocalizedMessage();
-            String exceptionString = ex.toString();
-        }
-
+        setSessionState(SIGNED_IN);
     }
 
     @Override
@@ -139,7 +155,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         Log.i(TAG, "onConnectionFailed: ConnectionResult.getErrorCode() = "
                 + result.getErrorCode());
 
-        if (mSignInProgress != STATE_IN_PROGRESS) {
+        if (mSignInProgress != OPENING) {
             // We do not have an intent in progress so we should store the latest
             // error resolution intent for use when the sign in button is clicked.
             mSignInIntent = result.getResolution();
@@ -155,7 +171,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
 
         // In this sample we consider the user signed out whenever they do not have
         // a connection to Google Play services.
-        onSignedOut();
+        setSessionState(CLOSED);
     }
 
     private void resolveSignInError() {
@@ -170,7 +186,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                 // OnConnectionFailed callback.  This will allow the user to
                 // resolve the error currently preventing our connection to
                 // Google Play services.
-                mSignInProgress = STATE_IN_PROGRESS;
+                mSignInProgress = OPENING;
+                setSessionState(OPENING);
                 startIntentSenderForResult(mSignInIntent.getIntentSender(),
                         RC_SIGN_IN, null, 0, 0, 0);
             } catch (IntentSender.SendIntentException e) {
@@ -179,6 +196,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                 // The intent was canceled before it was sent.  Attempt to connect to
                 // get an updated ConnectionResult.
                 mSignInProgress = STATE_SIGNING_IN;
+                setSessionState(STATE_SIGNING_IN);
                 mGoogleApiClient.connect();
             }
         } else {
@@ -199,10 +217,12 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                     // If the error resolution was successful we should continue
                     // processing errors.
                     mSignInProgress = STATE_SIGNING_IN;
+                    setSessionState(STATE_SIGNING_IN);
                 } else {
                     // If the error resolution was not successful or the user canceled,
                     // we should stop processing errors.
                     mSignInProgress = SIGNED_IN;
+                    setSessionState(SIGNED_IN);
                 }
 
                 if (!mGoogleApiClient.isConnecting()) {
@@ -214,16 +234,6 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         }
     }
 
-    private void onSignedOut() {
-        // Update the UI to reflect that the user is signed out.
-        mSignInButton.setEnabled(true);
-        mSignOutButton.setEnabled(false);
-        mRevokeButton.setEnabled(false);
-
-        mStatus.setText("Signed out");
-
-    }
-
     @Override
     public void onClick(View v) {
         if (!mGoogleApiClient.isConnecting()) {
@@ -231,7 +241,6 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
             // between connected and not connected.
             switch (v.getId()) {
                 case R.id.sign_in_button:
-                    mStatus.setText("Signing In");
                     resolveSignInError();
                     break;
                 case R.id.sign_out_button:
@@ -278,5 +287,16 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+
+    private OnChangeListener mOnChangeListener;
+    private int mSignInProgress;
+
+    private void setSessionState(int sessionState) {
+        mSignInProgress = sessionState;
+        if (null != mOnChangeListener) {
+            mOnChangeListener.onChange(mSignInProgress);
+        }
     }
 }
