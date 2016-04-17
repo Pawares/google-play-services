@@ -55,7 +55,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                     String exceptionString = ex.toString();
                 }
                 break;
-            case STATE_SIGNING_IN:
+            case SIGN_IN_REQUIRED:
                 break;
             case OPENING:
                 mStatus.setText("Signing In");
@@ -80,7 +80,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
     private static final String TAG = "signin1";
 
     private static final int SIGNED_IN = 0;
-    private static final int STATE_SIGNING_IN = 1;
+    private static final int SIGN_IN_REQUIRED = 1;
     private static final int OPENING = 2;
     private static final int CLOSED = 3;
 
@@ -139,13 +139,18 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         // The connection to Google Play services was lost for some reason.
         // We call connect() to attempt to re-establish the connection or get a
         // ConnectionResult that we can attempt to resolve.
+        int CAUSE_SERVICE_DISCONNECTED = 1;
+        int CAUSE_NETWORK_LOST = 2;
+
+        String[] x = new String[]{"CAUSE_SERVICE_DISCONNECTED", "CAUSE_NETWORK_LOST"};
+        Log.e("ventura", "onConnectionSuspended(" + x[cause - 1] + ")");
+
         mGoogleApiClient.connect();
     }
 
     @Override
     public void onConnected(Bundle connectionHint) {
         // Indicate that the sign in process is complete.
-        mSignInProgress = SIGNED_IN;
         setSessionState(SIGNED_IN);
     }
 
@@ -161,8 +166,9 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
             // error resolution intent for use when the sign in button is clicked.
             mSignInIntent = result.getResolution();
             mSignInError = result.getErrorCode();
+            mConnectionResult = result;
 
-            if (mSignInProgress == STATE_SIGNING_IN) {
+            if (mSignInProgress == SIGN_IN_REQUIRED) {
                 // STATE_SIGNING_IN indicates the user already clicked the sign in button
                 // so we should continue processing errors until the user is signed in
                 // or they click cancel.
@@ -196,17 +202,15 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
                 // OnConnectionFailed callback.  This will allow the user to
                 // resolve the error currently preventing our connection to
                 // Google Play services.
-                mSignInProgress = OPENING;
                 setSessionState(OPENING);
-                startIntentSenderForResult(mSignInIntent.getIntentSender(),
-                        RC_SIGN_IN, null, 0, 0, 0);
+                mConnectionResult.startResolutionForResult(this, RC_SIGN_IN);
+                // startIntentSenderForResult(mSignInIntent.getIntentSender(),  RC_SIGN_IN, null, 0, 0, 0);
             } catch (IntentSender.SendIntentException e) {
                 Log.i(TAG, "Sign in intent could not be sent: "
                         + e.getLocalizedMessage());
                 // The intent was canceled before it was sent.  Attempt to connect to
                 // get an updated ConnectionResult.
-                mSignInProgress = STATE_SIGNING_IN;
-                setSessionState(STATE_SIGNING_IN);
+                setSessionState(SIGN_IN_REQUIRED);
                 mGoogleApiClient.connect();
             }
         } else {
@@ -233,7 +237,8 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
             // between connected and not connected.
             switch (v.getId()) {
                 case R.id.sign_in_button:
-                    Log.e("ventura", "state: " + Integer.toString(mSignInProgress));
+                    Log.e("ventura", "state : " + Integer.toString(mSignInProgress));
+                    Log.e("ventura", "result: " + mConnectionResult.toString());
                     resolveSignInError();
                     break;
                 case R.id.sign_out_button:
@@ -285,6 +290,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
 
     private OnChangeListener mOnChangeListener;
     private int mSignInProgress;
+    private ConnectionResult mConnectionResult;
 
     private void setSessionState(int sessionState) {
         mSignInProgress = sessionState;
@@ -299,12 +305,10 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         if (resultCode == RESULT_OK) {
             // If the error resolution was successful we should continue
             // processing errors.
-            mSignInProgress = STATE_SIGNING_IN;
-            setSessionState(STATE_SIGNING_IN);
+            setSessionState(SIGN_IN_REQUIRED);
         } else {
             // If the error resolution was not successful or the user canceled,
             // we should stop processing errors.
-            mSignInProgress = SIGNED_IN;
             setSessionState(SIGNED_IN);
         }
 
@@ -316,7 +320,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
     }
 
     public void onStartClient() {
-        mGoogleApiClient.connect();
+       signIn();
     }
 
     public void onStopClient() {
@@ -329,7 +333,7 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         switch (mSignInProgress) {
             case SIGNED_IN:
                 break;
-            case STATE_SIGNING_IN:
+            case SIGN_IN_REQUIRED:
                 break;
             case OPENING:
                 break;
@@ -342,12 +346,41 @@ public class MainActivity extends ActionBarActivity implements GoogleApiClient.C
         switch (mSignInProgress) {
             case SIGNED_IN:
                 break;
-            case STATE_SIGNING_IN:
+            case SIGN_IN_REQUIRED:
                 break;
             case OPENING:
                 break;
             case CLOSED:
                 break;
         }
+    }
+
+    private void signIn() {
+        if (!mGoogleApiClient.isConnected() && !mGoogleApiClient.isConnecting()) {
+            mGoogleApiClient.connect();
+        }
+    }
+
+    private void signUp() {
+        // We have an intent which will allow our user to sign in or
+        // resolve an error.  For example if the user needs to
+        // select an account to sign in with, or if they need to consent
+        // to the permissions your app is requesting.
+        try {
+            // Send the pending intent that we stored on the most recent
+            // OnConnectionFailed callback.  This will allow the user to
+            // resolve the error currently preventing our connection to
+            // Google Play services.
+            setSessionState(OPENING);
+            mConnectionResult.startResolutionForResult(this, RC_SIGN_IN);
+        } catch (IntentSender.SendIntentException e) {
+            // The intent was canceled before it was sent.  Attempt to connect to
+            // get an updated ConnectionResult.
+            setSessionState(SIGN_IN_REQUIRED);
+            signIn();
+        }
+    }
+
+    private void signOut() {
     }
 }
